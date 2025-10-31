@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Expense Tracker + AI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans','Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      min-height: 100vh; margin: 0; padding: 20px; color:#333;
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .header-banner {
+      background: linear-gradient(135deg,#6c5ce7,#a29bfe);
+      color:#fff; padding: 36px 28px; border-radius: 18px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+      text-align:center; position:relative; overflow:hidden;
+    }
+    .header-banner::before {
+      content:''; position:absolute; top:-40%; right:-40%; width:180%; height:180%;
+      background: radial-gradient(circle,rgba(255,255,255,.12) 0%, transparent 60%);
+      animation:pulse 14s infinite;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1);opacity:.3} 50%{transform:scale(1.08);opacity:.5} }
+    .header-banner h1 { margin:0 0 6px; font-size: 1.9rem; font-weight:700; }
+    .header-banner p { margin:0; opacity:.9 }
+    .summary-cards { display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:18px; margin:22px 0 24px; }
+    .card {
+      background:#fff; padding:22px; border-radius:14px; box-shadow:0 5px 18px rgba(0,0,0,.1);
+      position:relative; overflow:hidden; transition:.25s;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow:0 10px 26px rgba(0,0,0,.15); }
+    .card::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px;
+      background: linear-gradient(90deg,#6c5ce7,#a29bfe);
+    }
+    .card .label { color:#666; font-size:.9rem; margin-bottom:8px; display:block; }
+    .card .value { font-size:2rem; font-weight:700; color:#333; }
+    .card i { position:absolute; top:20px; right:20px; font-size:1.6rem; color:#6c5ce7; opacity:.35; }
+    .section-box {
+      background:#fff; padding:24px; border-radius:14px; box-shadow:0 5px 18px rgba(0,0,0,.1);
+      margin-bottom:22px; transition:.25s;
+    }
+    .section-box:hover { box-shadow:0 8px 24px rgba(0,0,0,.15); }
+    .section-box h2 { margin:0 0 6px; font-size:1.4rem; display:flex; gap:8px; align-items:center; }
+    .section-box h2::before { content:"📊"; font-size:1.15rem; }
+    .subtitle { color:#666; margin:2px 0 16px; }
+    .expense-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+    .input-group { display:flex; flex-direction:column; }
+    .input-group label { font-size:.9rem; font-weight:600; margin-bottom:6px; color:#444; }
+    .input-group input, .input-group select {
+      padding:11px; border:2px solid #e6e6f5; border-radius:10px; font-size:1rem; background:#fafafa; transition:.2s;
+    }
+    .input-group input:focus, .input-group select:focus {
+      border-color:#6c5ce7; outline:none; background:#fff; box-shadow:0 0 0 3px rgba(108,92,231,.12);
+    }
+    .form-footer { grid-column: 1 / -1; display:flex; justify-content:flex-end; margin-top:6px; }
+    #add-expense-btn {
+      background: linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; padding:12px 22px; border:none; border-radius:10px;
+      cursor:pointer; font-weight:700; box-shadow:0 4px 14px rgba(108,92,231,.35); transition:.2s;
+    }
+    #add-expense-btn:hover { transform: translateY(-1px); box-shadow:0 7px 20px rgba(108,92,231,.45); }
+    #add-expense-btn:active { transform: translateY(0); }
+    .empty-state { text-align:center; padding:46px 12px; color:#999; }
+    .chart-icon-box { display:flex; justify-content:center; align-items:flex-end; height:58px; margin-bottom:16px; }
+    .chart-icon-box .bar { width:12px; margin:0 5px; border-radius:3px 3px 0 0; animation:barGrow 1s ease-out; }
+    @keyframes barGrow { from { height:0 } }
+    .bar-green{height:68%; background:#4CAF50} .bar-red{height:88%; background:#F44336} .bar-blue{height:52%; background:#2196F3}
+    .expense-item {
+      display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 60px; align-items:center; gap:8px;
+      padding:14px 6px; border-bottom:1px solid #f0f0f6; transition:.15s; animation:fadeIn .25s ease-out;
+    }
+    @keyframes fadeIn { from {opacity:0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+    .expense-item:hover { background:#fafafe; }
+    .amount-value { font-weight:700; color:#F44336; }
+    .delete-btn { background:none; border:none; color:#999; cursor:pointer; font-size:1.05rem; transition:.2s; }
+    .delete-btn:hover { color:#F44336; transform: scale(1.08); }
+    #categoryChart { max-height:360px; margin-top:10px; }
+    /* Chatbot */
+    .chatbot-toggle {
+      position:fixed; bottom:26px; right:26px; width:62px; height:62px; border-radius:50%;
+      background: linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 10px 30px rgba(108,92,231,.5); cursor:pointer; z-index:1000; transition:.2s; animation:float 3s ease-in-out infinite;
+    }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    .chatbot-toggle:hover { transform: scale(1.06); }
+    .chatbot-container {
+      position:fixed; bottom:98px; right:26px; width:380px; height:560px; background:#fff; border-radius:18px;
+      box-shadow:0 12px 48px rgba(0,0,0,.28); display:none; flex-direction:column; overflow:hidden; z-index:999;
+      animation: slideUp .25s ease-out;
+    }
+    .chatbot-container.active { display:flex; }
+    @keyframes slideUp { from {opacity:0; transform: translateY(14px)} to {opacity:1; transform:none} }
+    .chatbot-header {
+      background: linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; padding:16px 18px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .chatbot-header h3 { margin:0; font-size:1.05rem; display:flex; align-items:center; gap:10px; }
+    .chatbot-close { background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer; opacity:.9; }
+    .chatbot-messages { flex:1; padding:16px; overflow-y:auto; background:#f6f7fb; }
+    .message { margin-bottom:12px; display:flex; gap:10px; }
+    .message .message-content { max-width:76%; padding:11px 14px; border-radius:14px; line-height:1.5; }
+    .message.bot .message-content { background:#fff; color:#333; border-bottom-left-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,.08); }
+    .message.user { justify-content:flex-end; }
+    .message.user .message-content { background: linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; border-bottom-right-radius:6px; }
+    .typing-indicator { display:flex; gap:6px; padding:10px 12px; background:#fff; border-radius:14px; width:fit-content; }
+    .typing-indicator span { width:7px; height:7px; background:#6c5ce7; border-radius:50%; animation:typing 1.3s infinite; opacity:.7 }
+    .typing-indicator span:nth-child(2){animation-delay:.18s} .typing-indicator span:nth-child(3){animation-delay:.36s}
+    @keyframes typing { 0%,60%,100%{transform:translateY(0);opacity:.5} 30%{transform:translateY(-8px);opacity:1} }
+    .chatbot-input-area { padding:12px; background:#fff; border-top:1px solid #ececf6; display:flex; gap:10px; }
+    .chatbot-input { flex:1; padding:11px 14px; border:2px solid #e6e6f5; border-radius:24px; font-size:.95rem; }
+    .chatbot-input:focus { outline:none; border-color:#6c5ce7; }
+    .chatbot-send { width:44px; height:44px; border-radius:50%; border:none; background: linear-gradient(135deg,#6c5ce7,#a29bfe); color:#fff; cursor:pointer; }
+    .quick-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .quick-action-chip { background:#eeeef9; border:none; padding:8px 14px; border-radius:18px; font-size:.85rem; cursor:pointer; color:#5755d9; }
+    @media (max-width: 768px) {
+      .expense-item { grid-template-columns: 1fr 1fr; grid-template-areas:
+        "desc amount" "cat date" "delete delete"; gap:8px; }
+      .expense-item .description { grid-area: desc; font-weight:700; }
+      .expense-item .amount-value { grid-area: amount; text-align:right; }
+      .expense-item .category { grid-area: cat; }
+      .expense-item .date { grid-area: date; text-align:right; }
+      .expense-item .delete-btn-cell { grid-area: delete; text-align:center; }
+      .chatbot-container { width: calc(100% - 20px); right:10px; left:10px; height:520px; bottom:88px; }
+      .chatbot-toggle { right:20px; bottom:20px; }
+      .header-banner h1 { font-size:1.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-banner">
+      <h1>💰 Smart Expense Tracker</h1>
+      <p>Track spending with ease and get AI-powered insights</p>
+    </div>
+
+    <div class="summary-cards">
+      <div class="card">
+        <span class="label">Total Amount</span>
+        <span class="value" id="total-amount">₹0.00</span>
+        <i class="fa-solid fa-indian-rupee-sign"></i>
+      </div>
+      <div class="card">
+        <span class="label">Total Entries</span>
+        <span class="value" id="total-entries">0</span>
+        <i class="fa-regular fa-calendar-days"></i>
+      </div>
+      <div class="card">
+        <span class="label">Average Amount</span>
+        <span class="value" id="average-amount">₹0.00</span>
+        <i class="fa-solid fa-chart-line"></i>
+      </div>
+    </div>
+
+    <div class="section-box">
+      <h2>+ Add New Expense</h2>
+      <p class="subtitle">Enter the details below</p>
+      <form id="expense-form" class="expense-grid">
+        <div class="input-group">
+          <label for="description">Description</label>
+          <input type="text" id="description" placeholder="Where did you spend?" required />
+        </div>
+        <div class="input-group">
+          <label for="amount">Amount (₹)</label>
+          <input type="number" id="amount" step="0.01" placeholder="0.00" required />
+        </div>
+        <div class="input-group">
+          <label for="date">Date</label>
+          <input type="date" id="date" required />
+        </div>
+        <div class="input-group">
+          <label for="category">Category</label>
+          <select id="category" required>
+            <option value="" disabled selected>Select category</option>
+            <option>🥘Food</option>
+            <option>🚘Transport</option>
+            <option>🛍Shopping</option>
+            <option>⚡Electric Bills</option>
+            <option>🩺Hospital Bills</option>
+            <option>📚Education</option>
+            <option>🎉Entertainment</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label for="payment-mode">Payment Mode</label>
+          <select id="payment-mode" required>
+            <option value="" disabled selected>Select mode</option>
+            <option>💸Cash</option>
+            <option>💳Debit Card</option>
+            <option>💳Credit Card</option>
+            <option>🆙UPI</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label for="mood">Mood</label>
+          <select id="mood">
+            <option value="" disabled selected>How do you feel?</option>
+            <option>Happy 😊</option>
+            <option>Neutral 😐</option>
+            <option>Sad 😞</option>
+          </select>
+        </div>
+        <div class="form-footer">
+          <button type="submit" id="add-expense-btn">
+            <i class="fa-solid fa-plus"></i> Add Expense
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section-box">
+      <h2>Your Expenses</h2>
+      <p class="subtitle">View and manage your tracked expenses</p>
+      <div id="expense-list">
+        <div class="empty-state">
+          <div class="chart-icon-box">
+            <div class="bar bar-green"></div>
+            <div class="bar bar-red"></div>
+            <div class="bar bar-blue"></div>
+          </div>
+          <p><strong>No expenses yet</strong></p>
+          <p>Start by adding your first expense above</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-box">
+      <h2>Expense by Category</h2>
+      <canvas id="categoryChart"></canvas>
+    </div>
+  </div>
+
+  <!-- AI Chatbot -->
+  <div class="chatbot-toggle" id="chatbot-toggle" aria-label="Open AI Assistant">
+    <i class="fa-solid fa-robot"></i>
+  </div>
+  <div class="chatbot-container" id="chatbot-container" aria-live="polite">
+    <div class="chatbot-header">
+      <h3><i class="fa-solid fa-robot"></i> AI Assistant</h3>
+      <button class="chatbot-close" id="chatbot-close" aria-label="Close"><i class="fa-solid fa-times"></i></button>
+    </div>
+    <div class="chatbot-messages" id="chatbot-messages">
+      <div class="message bot">
+        <div class="message-content">
+          Hi! 👋 I analyze your spending, answer questions, and suggest savings. Try: “What’s my total?”, “Top category”, “Recent expenses”, “Show Food this month”.
+        </div>
+      </div>
+      <div class="quick-actions" id="quick-actions">
+        <button class="quick-action-chip" data-question="What's my total spending?">💰 Total</button>
+        <button class="quick-action-chip" data-question="Show my top category">📊 Top Category</button>
+        <button class="quick-action-chip" data-question="Give me saving tips">💡 Tips</button>
+        <button class="quick-action-chip" data-question="Show recent expenses">📅 Recent</button>
+      </div>
+    </div>
+    <div class="chatbot-input-area">
+      <input type="text" class="chatbot-input" id="chatbot-input" placeholder="Ask me anything..." />
+      <button class="chatbot-send" id="chatbot-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <script>
+    // ---- State and DOM ----
+    let expenses = loadExpenses();
+    let categoryChart;
+
+    const form = document.getElementById("expense-form");
+    const totalAmountEl = document.getElementById("total-amount");
+    const totalEntriesEl = document.getElementById("total-entries");
+    const averageAmountEl = document.getElementById("average-amount");
+    const expenseListEl = document.getElementById("expense-list");
+    const categoryCtx = document.getElementById("categoryChart").getContext("2d");
+
+    const chatbotToggle = document.getElementById("chatbot-toggle");
+    const chatbotContainer = document.getElementById("chatbot-container");
+    const chatbotClose = document.getElementById("chatbot-close");
+    const chatbotMessages = document.getElementById("chatbot-messages");
+    const chatbotInput = document.getElementById("chatbot-input");
+    const chatbotSend = document.getElementById("chatbot-send");
+    const quickActions = document.getElementById("quick-actions");
+
+    // ---- Storage helpers ----
+    function loadExpenses() {
+      try {
+        const saved = localStorage.getItem("expenses_v2");
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    function persistExpenses() {
+      localStorage.setItem("expenses_v2", JSON.stringify(expenses));
+    }
+
+    // ---- Formatting ----
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amount);
+    }
+    function formatDateDisplay(isoDate) {
+      if (!isoDate) return "";
+      const [y,m,d] = isoDate.split("-");
+      return new Date(`${y}-${m}-${d}`).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+    }
+
+    // ---- CRUD ----
+    function addExpense(e) {
+      e.preventDefault();
+      const description = document.getElementById("description").value.trim();
+      const amount = parseFloat(document.getElementById("amount").value);
+      const date = document.getElementById("date").value;
+      const category = document.getElementById("category").value;
+      const paymentMode = document.getElementById("payment-mode").value;
+      const mood = document.getElementById("mood").value || "Neutral 😐";
+
+      if (!description || !date || !category || !paymentMode || !isFinite(amount) || amount <= 0) {
+        alert("Please fill all required fields with valid data.");
+        return;
+      }
+
+      const exp = {
+        id: Date.now(),
+        description,
+        amount: Math.round(amount * 100) / 100,
+        rawDate: date,
+        date: formatDateDisplay(date),
+        category,
+        paymentMode,
+        mood
+      };
+      expenses.unshift(exp);
+      persistExpenses();
+      updateSummary();
+      renderExpenses();
+      drawChart();
+      form.reset();
+    }
+
+    function deleteExpense(id) {
+      expenses = expenses.filter(e => e.id !== id);
+      persistExpenses();
+      updateSummary();
+      renderExpenses();
+      drawChart();
+    }
+
+    // ---- UI updates ----
+    function updateSummary() {
+      const total = expenses.reduce((s,e)=> s + e.amount, 0);
+      const count = expenses.length;
+      const avg = count ? total / count : 0;
+      totalAmountEl.textContent = formatCurrency(total);
+      totalEntriesEl.textContent = count;
+      averageAmountEl.textContent = formatCurrency(avg);
+    }
+
+    function renderExpenses() {
+      if (!expenses.length) {
+        expenseListEl.innerHTML = `
+          <div class="empty-state">
+            <div class="chart-icon-box">
+              <div class="bar bar-green"></div>
+              <div class="bar bar-red"></div>
+              <div class="bar bar-blue"></div>
+            </div>
+            <p><strong>No expenses yet</strong></p>
+            <p>Start by adding your first expense above</p>
+          </div>`;
+        return;
+      }
+      expenseListEl.innerHTML = "";
+      expenses.forEach(exp => {
+        const row = document.createElement("div");
+        row.className = "expense-item";
+        row.innerHTML = `
+          <div class="description">${escapeHTML(exp.description)}</div>
+          <div class="amount-value">${formatCurrency(exp.amount)}</div>
+          <div class="category">${escapeHTML(exp.category)}</div>
+          <div class="date">${escapeHTML(exp.date)}</div>
+          <div class="delete-btn-cell">
+            <button class="delete-btn" title="Delete" aria-label="Delete" data-id="${exp.id}">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        `;
+        row.querySelector(".delete-btn").addEventListener("click", () => deleteExpense(exp.id));
+        expenseListEl.appendChild(row);
+      });
+    }
+
+    function escapeHTML(s="") {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+
+    // ---- Chart.js ----
+    function drawChart() {
+      const totals = {};
+      expenses.forEach(e => { totals[e.category] = (totals[e.category]||0) + e.amount; });
+      const labels = Object.keys(totals);
+      const data = Object.values(totals);
+
+      if (categoryChart) categoryChart.destroy();
+
+      categoryChart = new Chart(categoryCtx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Total Spent (₹)",
+            data,
+            backgroundColor: ["#6C5CE7","#74B9FF","#55EFC4","#FAB1A0","#FD79A8","#FFEAA7","#00B894","#A29BFE"],
+            borderWidth: 0,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${formatCurrency(ctx.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: "#4a4a4a" } },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: "#4a4a4a",
+                callback: v => new Intl.NumberFormat("en-IN",{ style:"currency", currency:"INR", maximumFractionDigits:0 }).format(v)
+              },
+              grid: { color: "rgba(0,0,0,0.06)" }
+            }
+          },
+          animation: { duration: 350 }
+        }
+      });
+    }
+
+    // ---- Chatbot logic (client-only AI) ----
+    function addBotMessage(html) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "message bot";
+      const bubble = document.createElement("div");
+      bubble.className = "message-content";
+      bubble.innerHTML = html;
+      wrapper.appendChild(bubble);
+      chatbotMessages.appendChild(wrapper);
+      chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+    function addUserMessage(text) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "message user";
+      const bubble = document.createElement("div");
+      bubble.className = "message-content";
+      bubble.textContent = text;
+      wrapper.appendChild(bubble);
+      chatbotMessages.appendChild(wrapper);
+      chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+    function addTyping() {
+      const wrap = document.createElement("div");
+      wrap.className = "message bot";
+      wrap.id = "typing";
+      wrap.innerHTML = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+      chatbotMessages.appendChild(wrap);
+      chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+    function removeTyping() {
+      const t = document.getElementById("typing");
+      if (t) t.remove();
+    }
+
+    // Natural-ish queries -> analytics over local data
+    function answerQuery(qRaw) {
+      const q = (qRaw||"").toLowerCase();
+
+      // Helpers
+      const total = expenses.reduce((s,e)=> s + e.amount, 0);
+      const count = expenses.length;
+      const avg = count ? total / count : 0;
+
+      const byCategory = {};
+      expenses.forEach(e => { byCategory[e.category] = (byCategory[e.category]||0) + e.amount; });
+      const topCat = Object.entries(byCategory).sort((a,b)=> b[1]-a[1])[0];
+
+      const recent = [...expenses].sort((a,b)=> (b.rawDate||"") > (a.rawDate||"") ? 1 : -1).slice(0,5);
+
+      // Filters
+      const monthNow = new Date().toISOString().slice(0,7); // yyyy-mm
+      const isThisMonth = e => (e.rawDate||"").startsWith(monthNow);
+
+      // Simple intents
+      if (q.includes("total")) {
+        return `Total spending is <b>${formatCurrency(total)}</b> across ${count} entries. Average per entry is ${formatCurrency(avg)}.`; 
+      }
+      if (q.includes("average")) {
+        return `Average spend per entry is <b>${formatCurrency(avg)}</b> from ${count} entries.`; 
+      }
+      if (q.includes("top category") || q.includes("highest category")) {
+        if (!topCat) return "No data yet. Add some expenses to see your top category.";
+        return `Your top category is <b>${escapeHTML(topCat[0])}</b> at ${formatCurrency(topCat[1])}.`; 
+      }
+      if (q.includes("recent")) {
+        if (!recent.length) return "No recent expenses found.";
+        const lines = recent.map(e => `${escapeHTML(e.description)} — ${formatCurrency(e.amount)} (${escapeHTML(e.category)}) on ${escapeHTML(e.date)}`);
+        return `Here are your recent expenses:<br>${lines.join("<br>")}`; 
+      }
+      if (q.includes("this month")) {
+        const monthItems = expenses.filter(isThisMonth);
+        const monthTotal = monthItems.reduce((s,e)=> s + e.amount, 0);
+        return monthItems.length ? `This month: ${monthItems.length} entries totaling <b>${formatCurrency(monthTotal)}</b>.` : "No expenses recorded this month."; 
+      }
+      // Category filter like "show food", "food spend"
+      const catMatch = Object.keys(byCategory).find(c => q.includes(c.toLowerCase()));
+      if (catMatch) {
+        const list = expenses.filter(e => e.category.toLowerCase() === catMatch.toLowerCase());
+        const t = list.reduce((s,e)=> s + e.amount, 0);
+        if (!list.length) return `No expenses found for ${escapeHTML(catMatch)}.`;
+        const lines = list.slice(0,6).map(e => `${escapeHTML(e.description)} — ${formatCurrency(e.amount)} on ${escapeHTML(e.date)}`);
+        return `${escapeHTML(catMatch)} total is <b>${formatCurrency(t)}</b> across ${list.length} entries.<br>${lines.join("<br>")}`; 
+      }
+      // Payment mode filter
+      const modes = ["cash","debit card","credit card","upi"];
+      const modeHit = modes.find(m => q.includes(m));
+      if (modeHit) {
+        const list = expenses.filter(e => e.paymentMode.toLowerCase() === modeHit);
+        const t = list.reduce((s,e)=> s + e.amount, 0);
+        if (!list.length) return `No ${modeHit} expenses found.`;
+        return `${modeHit.toUpperCase()} spending is <b>${formatCurrency(t)}</b> across ${list.length} entries.`; 
+      }
+      // Tips
+      if (q.includes("tip") || q.includes("save") || q.includes("saving")) {
+        const tips = [
+          "Set a weekly cap for your top category and track it against remaining budget.",
+          "Batch purchases to reduce small, frequent spends and delivery fees.",
+          "Prefer UPI or cashbacks only if it prevents impulse buys; log every transaction same day.",
+          "Create category alerts: notify yourself when a category crosses 70% of your monthly budget."
+        ];
+        return `Here are some focused tips:<br>• ${tips.join("<br>• ")}`; 
+      }
+      // Default combined summary
+      if (!expenses.length) return "Add some expenses and ask me anything like total, top category, or this month.";
+      const topLine = topCat ? ` Top category: <b>${escapeHTML(topCat[0])}</b> at ${formatCurrency(topCat[1])}.` : "";
+      return `You’ve spent ${formatCurrency(total)} across ${count} entries. Average is ${formatCurrency(avg)}.${topLine}`; 
+    }
+
+    // ---- Events ----
+    form.addEventListener("submit", addExpense);
+    chatbotToggle.addEventListener("click", () => chatbotContainer.classList.add("active"));
+    chatbotClose.addEventListener("click", () => chatbotContainer.classList.remove("active"));
+    chatbotSend.addEventListener("click", () => {
+      const text = chatbotInput.value.trim();
+      if (!text) return;
+      addUserMessage(text);
+      chatbotInput.value = "";
+      addTyping();
+      setTimeout(() => {
+        removeTyping();
+        const reply = answerQuery(text);
+        addBotMessage(reply);
+      }, 450);
+    });
+    chatbotInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") chatbotSend.click();
+    });
+    quickActions.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-question]");
+      if (!btn) return;
+      chatbotInput.value = btn.getAttribute("data-question");
+      chatbotSend.click();
+    });
+
+    // ---- Init ----
+    updateSummary();
+    renderExpenses();
+    drawChart();
+  </script>
+</body>
+</html>
